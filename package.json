@@ -22,13 +22,13 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
-    "dev": "bun run --watch ./src/main.ts",
+    "build": "echo \"nothing to build\"",
+    "dev": "node src/main.js",
     "knip": "knip-bun",
     "lint": "eslint .",
-    "prepack": "bun run build",
+    "prepack": "echo \"no-op build\"",
     "release": "bumpp && bun publish --access public",
-    "start": "NODE_ENV=production bun run ./src/main.ts"
+    "start": "NODE_ENV=production node dist/main.js"
   },
   "simple-git-hooks": {
     "pre-commit": "bunx lint-staged"
