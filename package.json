@@ -22,7 +22,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "echo \"nothing to build\"",
+    "build": "tsup",
     "dev": "node src/main.js",
     "knip": "knip-bun",
     "lint": "eslint . --cache",

@@ -1,12 +1,1328 @@
 #!/usr/bin/env node
-import{defineCommand as ut,runMain as dt}from"citty";import{defineCommand as Ee}from"citty";import q from"consola";import A from"node:fs/promises";import Ae from"node:os";import z from"node:path";var K=z.join(Ae.homedir(),".local","share","copilot-api"),xe=z.join(K,"github_token"),h={APP_DIR:K,GITHUB_TOKEN_PATH:xe};async function C(){await A.mkdir(h.APP_DIR,{recursive:!0}),await Ce(h.GITHUB_TOKEN_PATH)}async function Ce(e){try{await A.access(e,A.constants.W_OK)}catch{await A.writeFile(e,""),await A.chmod(e,384)}}var s={accountType:"individual",manualApprove:!1,rateLimitWait:!1,showToken:!1};import p from"consola";import le from"node:fs/promises";import{randomUUID as Se}from"node:crypto";var d=()=>({"content-type":"application/json",accept:"application/json"}),Q="0.26.7",X=`copilot-chat/${Q}`,Y=`GitHubCopilotChat/${Q}`,Z="2025-04-01",b=e=>e.accountType==="individual"?"https://api.githubcopilot.com":`https://api.${e.accountType}.githubcopilot.com`,_=(e,t=!1)=>{let n={Authorization:`Bearer ${e.copilotToken}`,"content-type":d()["content-type"],"copilot-integration-id":"vscode-chat","editor-version":`vscode/${e.vsCodeVersion}`,"editor-plugin-version":X,"user-agent":Y,"openai-intent":"conversation-panel","x-github-api-version":Z,"x-request-id":Se(),"x-vscode-user-agent-library-version":"electron-fetch"};return t&&(n["copilot-vision-request"]="true"),n},k="https://api.github.com",S=e=>({...d(),authorization:`token ${e.githubToken}`,"editor-version":`vscode/${e.vsCodeVersion}`,"editor-plugin-version":X,"user-agent":Y,"x-github-api-version":Z,"x-vscode-user-agent-library-version":"electron-fetch"}),v="https://github.com",R="Iv1.b507a08c87ecfe98",ee=["read:user"].join(" ");import P from"consola";var c=class extends Error{response;constructor(t,n){super(t),this.response=n}};async function f(e,t){if(P.error("Error occurred:",t),t instanceof c){let n=t.response.clone(),o,i;try{i=await n.json(),P.error("HTTP error:",i),o=typeof i=="string"?i:JSON.stringify(i)}catch{try{o=await n.text(),P.error("HTTP error text:",o)}catch{o="Failed to read error response",P.error("Failed to read error response body")}}return e.json({error:{message:o,type:"error"}},t.response.status)}return e.json({error:{message:t.message,type:"error"}},500)}var G=async()=>{let e=await fetch(`${k}/copilot_internal/v2/token`,{headers:S(s)});if(!e.ok)throw new c("Failed to get Copilot token",e);return await e.json()};async function te(){let e=await fetch(`${v}/login/device/code`,{method:"POST",headers:d(),body:JSON.stringify({client_id:R,scope:ee})});if(!e.ok)throw new c("Failed to get device code",e);return await e.json()}async function oe(){let e=await fetch(`${k}/user`,{headers:{authorization:`token ${s.githubToken}`,...d()}});if(!e.ok)throw new c("Failed to get GitHub user",e);return await e.json()}import $ from"consola";import ve from"consola";var ne=async()=>{let e=await fetch(`${b(s)}/models`,{headers:_(s)});if(!e.ok)throw new c("Failed to get models",e);return await e.json()};var re="1.98.1";async function L(){let e=new AbortController,t=setTimeout(()=>{e.abort()},5e3);try{let o=await(await fetch("https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=visual-studio-code-bin",{signal:e.signal})).text(),i=/pkgver=([0-9.]+)/,r=o.match(i);return r?r[1]:re}catch{return re}finally{clearTimeout(t)}}await L();var x=e=>new Promise(t=>{setTimeout(t,e)}),se=e=>e==null;async function E(){let e=await ne();s.models=e}var ie=async()=>{let e=await L();s.vsCodeVersion=e,ve.info(`Using VSCode version: ${e}`)};async function ae(e){let t=(e.interval+1)*1e3;for($.debug(`Polling access token with interval of ${t}ms`);;){let n=await fetch(`${v}/login/oauth/access_token`,{method:"POST",headers:d(),body:JSON.stringify({client_id:R,device_code:e.device_code,grant_type:"urn:ietf:params:oauth:grant-type:device_code"})});if(!n.ok){await x(t),$.error("Failed to poll access token:",await n.text());continue}let o=await n.json();$.debug("Polling access token response:",o);let{access_token:i}=o;if(i)return i;await x(t)}}var Re=()=>le.readFile(h.GITHUB_TOKEN_PATH,"utf8"),Pe=e=>le.writeFile(h.GITHUB_TOKEN_PATH,e),pe=async()=>{let{token:e,refresh_in:t}=await G();s.copilotToken=e,p.debug("GitHub Copilot Token fetched successfully!"),s.showToken&&p.info("Copilot token:",e);let n=(t-60)*1e3;setInterval(async()=>{p.debug("Refreshing Copilot token");try{let{token:o}=await G();s.copilotToken=o,p.debug("Copilot token refreshed"),s.showToken&&p.info("Refreshed Copilot token:",o)}catch(o){throw p.error("Failed to refresh Copilot token:",o),o}},n)};async function H(e){try{let t=await Re();if(t&&!e?.force){s.githubToken=t,s.showToken&&p.info("GitHub token:",t),await ce();return}p.info("Not logged in, getting new access token");let n=await te();p.debug("Device code response:",n),p.info(`Please enter the code "${n.user_code}" in ${n.verification_uri}`);let o=await ae(n);await Pe(o),s.githubToken=o,s.showToken&&p.info("GitHub token:",o),await ce()}catch(t){throw t instanceof c?(p.error("Failed to get GitHub token:",await t.response.json()),t):(p.error("Failed to get GitHub token:",t),t)}}async function ce(){let e=await oe();p.info(`Logged in as ${e.login}`)}async function He(e){e.verbose&&(q.level=5,q.info("Verbose logging enabled")),s.showToken=e.showToken,await C(),await H({force:!0}),q.success("GitHub token written to",h.GITHUB_TOKEN_PATH)}var me=Ee({meta:{name:"auth",description:"Run GitHub auth flow without running the server"},args:{verbose:{alias:"v",type:"boolean",default:!1,description:"Enable verbose logging"},"show-token":{type:"boolean",default:!1,description:"Show GitHub token on auth"}},run({args:e}){return He({verbose:e.verbose,showToken:e["show-token"]})}});import{defineCommand as at}from"citty";import ct from"clipboardy";import u from"consola";import{serve as lt}from"srvx";import pt from"tiny-invariant";import{execSync as Ie}from"node:child_process";import Be from"node:process";function Oe(){let{platform:e,ppid:t,env:n}=Be;if(e==="win32"){try{let o=`wmic process get ParentProcessId,Name | findstr "${t}"`;if(Ie(o,{stdio:"pipe"}).toString().toLowerCase().includes("powershell.exe"))return"powershell"}catch{return"cmd"}return"cmd"}else{let o=n.SHELL;if(o){if(o.endsWith("zsh"))return"zsh";if(o.endsWith("fish"))return"fish";if(o.endsWith("bash"))return"bash"}return"sh"}}function ue(e,t=""){let n=Oe(),o=Object.entries(e).filter(([,r])=>r!==void 0),i;switch(n){case"powershell":{i=o.map(([r,a])=>`$env:${r} = ${a}`).join("; ");break}case"cmd":{i=o.map(([r,a])=>`set ${r}=${a}`).join(" & ");break}case"fish":{i=o.map(([r,a])=>`set -gx ${r} ${a}`).join("; ");break}default:{let r=o.map(([a,m])=>`${a}=${m}`).join(" ");i=o.length>0?`export ${r}`:"";break}}return i&&t?`${i}${n==="cmd"?" & ":" && "}${t}`:i||t}import{Hono as rt}from"hono";import{cors as st}from"hono/cors";import{logger as it}from"hono/logger";import{Hono as Le}from"hono";import w from"consola";import{streamSSE as Ne}from"hono/streaming";import Me from"consola";var I=async()=>{if(!await Me.prompt("Accept incoming request?",{type:"confirm"}))throw new c("Request rejected",Response.json({message:"Request rejected"},{status:403}))};import D from"consola";async function B(e){if(e.rateLimitSeconds===void 0)return;let t=Date.now();if(!e.lastRequestTimestamp){e.lastRequestTimestamp=t;return}let n=(t-e.lastRequestTimestamp)/1e3;if(n>e.rateLimitSeconds){e.lastRequestTimestamp=t;return}let o=Math.ceil(e.rateLimitSeconds-n);if(!e.rateLimitWait)throw D.warn(`Rate limit exceeded. Need to wait ${o} more seconds.`),new c("Rate limit exceeded",Response.json({message:"Rate limit exceeded"},{status:429}));let i=o*1e3;D.warn(`Rate limit reached. Waiting ${o} seconds before proceeding...`),await x(i),e.lastRequestTimestamp=t,D.info("Rate limit wait completed, proceeding with request")}import{countTokens as de}from"gpt-tokenizer/model/gpt-4o";var fe=e=>{let t=e.map(m=>{let T="";return typeof m.content=="string"?T=m.content:Array.isArray(m.content)&&(T=m.content.filter(g=>g.type==="text").map(g=>g.text).join("")),{...m,content:T}}),n=t.filter(m=>m.role!=="tool"),o=[],i=t.at(-1);i?.role==="assistant"&&(n=t.slice(0,-1),o=[i]);let r=de(n),a=de(o);return{input:r,output:a}};import je from"consola";import{events as Ue}from"fetch-event-stream";var O=async e=>{if(!s.copilotToken)throw new Error("Copilot token not found");let t=e.messages.some(o=>typeof o.content!="string"&&o.content?.some(i=>i.type==="image_url")),n=await fetch(`${b(s)}/chat/completions`,{method:"POST",headers:_(s,t),body:JSON.stringify(e)});if(!n.ok)throw je.error("Failed to create chat completions",n),new c("Failed to create chat completions",n);return e.stream?Ue(n):await n.json()};async function ge(e){await B(s);let t=await e.req.json();if(w.debug("Request payload:",JSON.stringify(t).slice(-400)),w.info("Current token count:",fe(t.messages)),s.manualApprove&&await I(),se(t.max_tokens)){let o=s.models?.data.find(i=>i.id===t.model);t={...t,max_tokens:o?.capabilities.limits.max_output_tokens},w.debug("Set max_tokens to:",JSON.stringify(t.max_tokens))}let n=await O(t);return Ge(n)?(w.debug("Non-streaming response:",JSON.stringify(n)),e.json(n)):(w.debug("Streaming response"),Ne(e,async o=>{for await(let i of n)w.debug("Streaming chunk:",JSON.stringify(i)),await o.writeSSE(i)}))}var Ge=e=>Object.hasOwn(e,"choices");var M=new Le;M.post("/",async e=>{try{return await ge(e)}catch(t){return await f(e,t)}});import{Hono as $e}from"hono";var he=async e=>{if(!s.copilotToken)throw new Error("Copilot token not found");let t=await fetch(`${b(s)}/embeddings`,{method:"POST",headers:_(s),body:JSON.stringify(e)});if(!t.ok)throw new c("Failed to create embeddings",t);return await t.json()};var j=new $e;j.post("/",async e=>{try{let t=await e.req.json(),n=await he(t);return e.json(n)}catch(t){return await f(e,t)}});import{Hono as et}from"hono";import y from"consola";import{streamSSE as Ye}from"hono/streaming";function U(e){return e===null?null:{stop:"end_turn",length:"max_tokens",tool_calls:"tool_use",content_filter:"end_turn"}[e]}function qe(e){let t=[];for(let n=0;n<e.length;n++){let o=e[n];if(t.push(o),o.role==="assistant"&&o.tool_calls&&o.tool_calls.length>0){let i=new Set,r=n+1;for(;r<e.length&&e[r].role==="tool";){let a=e[r];"tool_call_id"in a&&a.tool_call_id&&i.add(a.tool_call_id),r++}for(let a of o.tool_calls)i.has(a.id)||t.push({role:"tool",tool_call_id:a.id,content:"Tool execution completed."})}}return t}function ye(e){let t={model:e.model,messages:De(e.messages,e.system),max_tokens:e.max_tokens,stop:e.stop_sequences,stream:e.stream,temperature:e.temperature,top_p:e.top_p,user:e.metadata?.user_id,tools:We(e.tools),tool_choice:ze(e.tool_choice)};return t.messages=qe(t.messages),t}function De(e,t){let n=Ve(t),o=[];for(let i of e)if(i.role==="user")o.push(...Fe(i));else{let r=Je(i);o.push(...r)}return[...n,...o]}function Ve(e){return e?typeof e=="string"?[{role:"system",content:e}]:[{role:"system",content:e.map(n=>n.text).join(`
 
-`)}]:[]}function Fe(e){let t=[];if(Array.isArray(e.content)){let n=e.content.filter(r=>r.type==="tool_result"),o=e.content.filter(r=>r.type==="text"),i=e.content.filter(r=>r.type!=="tool_result"&&r.type!=="text");for(let r of n)t.push({role:"tool",tool_call_id:r.tool_use_id,content:typeof r.content=="string"?r.content:JSON.stringify(r.content)});if(o.length>0||i.length>0){let r=[...o.map(a=>a.text),...i.map(a=>JSON.stringify(a))].join(`
+// src/main.ts
+import { defineCommand as defineCommand3, runMain } from "citty";
 
-`).trim();r.length>0&&t.push({role:"user",content:r})}}else t.push({role:"user",content:V(e.content)});return t}function Je(e){if(!Array.isArray(e.content))return[{role:"assistant",content:V(e.content)}];let t=e.content.filter(o=>o.type==="tool_use"),n=e.content.filter(o=>o.type==="text");return t.length>0?[{role:"assistant",content:n.map(o=>o.text).join(`
+// src/auth.ts
+import { defineCommand } from "citty";
+import consola5 from "consola";
 
-`)||null,tool_calls:t.map(o=>({id:o.id,type:"function",function:{name:o.name,arguments:JSON.stringify(o.input)}}))}]:[{role:"assistant",content:V(e.content)}]}function V(e){if(typeof e=="string")return e;if(!Array.isArray(e))return null;if(!e.some(o=>o.type==="image"))return e.filter(o=>o.type==="text").map(o=>o.text).join(`
+// src/lib/paths.ts
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+var APP_DIR = path.join(os.homedir(), ".local", "share", "copilot-api");
+var GITHUB_TOKEN_PATH = path.join(APP_DIR, "github_token");
+var PATHS = {
+  APP_DIR,
+  GITHUB_TOKEN_PATH
+};
+async function ensurePaths() {
+  await fs.mkdir(PATHS.APP_DIR, { recursive: true });
+  await ensureFile(PATHS.GITHUB_TOKEN_PATH);
+}
+async function ensureFile(filePath) {
+  try {
+    await fs.access(filePath, fs.constants.W_OK);
+  } catch {
+    await fs.writeFile(filePath, "");
+    await fs.chmod(filePath, 384);
+  }
+}
 
-`);let n=[];for(let o of e)o.type==="text"?n.push({type:"text",text:o.text}):o.type==="image"&&n.push({type:"image_url",image_url:{url:`data:${o.source.media_type};base64,${o.source.data}`}});return n}function We(e){if(e)return e.map(t=>({type:"function",function:{name:t.name,description:t.description,parameters:t.input_schema}}))}function ze(e){if(e)switch(e.type){case"auto":return"auto";case"any":return"required";case"tool":return e.name?{type:"function",function:{name:e.name}}:void 0;case"none":return"none";default:return}}function be(e){let t=e.choices[0],n=Ke(t.message.content),o=Qe(t.message.tool_calls);return{id:e.id,type:"message",role:"assistant",model:e.model,content:[...n,...o],stop_reason:U(t.finish_reason),stop_sequence:null,usage:{input_tokens:e.usage?.prompt_tokens??0,output_tokens:e.usage?.completion_tokens??0}}}function Ke(e){return typeof e=="string"?[{type:"text",text:e}]:Array.isArray(e)?e.filter(t=>t.type==="text").map(t=>({type:"text",text:t.text})):[]}function Qe(e){return e?e.map(t=>({type:"tool_use",id:t.id,name:t.function.name,input:JSON.parse(t.function.arguments)})):[]}function Xe(e){return e.contentBlockOpen?Object.values(e.toolCalls).some(t=>t.anthropicBlockIndex===e.contentBlockIndex):!1}function _e(e,t){let n=[];if(e.choices.length===0)return n;let o=e.choices[0],{delta:i}=o;if(t.messageStartSent||(n.push({type:"message_start",message:{id:e.id,type:"message",role:"assistant",content:[],model:e.model,stop_reason:null,stop_sequence:null,usage:{input_tokens:1,output_tokens:1}}}),t.messageStartSent=!0),i.content&&(Xe(t)&&(n.push({type:"content_block_stop",index:t.contentBlockIndex}),t.contentBlockIndex++,t.contentBlockOpen=!1),t.contentBlockOpen||(n.push({type:"content_block_start",index:t.contentBlockIndex,content_block:{type:"text",text:""}}),t.contentBlockOpen=!0),n.push({type:"content_block_delta",index:t.contentBlockIndex,delta:{type:"text_delta",text:i.content}})),i.tool_calls)for(let r of i.tool_calls){if(r.id&&r.function?.name){t.contentBlockOpen&&(n.push({type:"content_block_stop",index:t.contentBlockIndex}),t.contentBlockIndex++,t.contentBlockOpen=!1);let a=t.contentBlockIndex;t.toolCalls[r.index]={id:r.id,name:r.function.name,anthropicBlockIndex:a},n.push({type:"content_block_start",index:a,content_block:{type:"tool_use",id:r.id,name:r.function.name,input:{}}}),t.contentBlockOpen=!0}if(r.function?.arguments){let a=t.toolCalls[r.index];a&&n.push({type:"content_block_delta",index:a.anthropicBlockIndex,delta:{type:"input_json_delta",partial_json:r.function.arguments}})}}return o.finish_reason&&(t.contentBlockOpen&&(n.push({type:"content_block_stop",index:t.contentBlockIndex}),t.contentBlockOpen=!1),n.push({type:"message_delta",delta:{stop_reason:U(o.finish_reason),stop_sequence:null},usage:{output_tokens:1}}),n.push({type:"message_stop"})),n}async function ke(e){await B(s);let t=await e.req.json();y.debug("Anthropic request payload:",JSON.stringify(t));let n=ye(t);y.debug("Translated OpenAI request payload:",JSON.stringify(n)),s.manualApprove&&await I();let o=await O(n);if(Ze(o)){y.debug("Non-streaming response from Copilot:",JSON.stringify(o).slice(-400));let i=be(o);return y.debug("Translated Anthropic response:",JSON.stringify(i)),e.json(i)}return y.debug("Streaming response from Copilot"),Ye(e,async i=>{let r={messageStartSent:!1,contentBlockIndex:0,contentBlockOpen:!1,toolCalls:{}};for await(let a of o){if(y.debug("Copilot raw stream event:",JSON.stringify(a)),a.data==="[DONE]")break;if(!a.data)continue;let m=JSON.parse(a.data),T=_e(m,r);for(let g of T)y.debug("Translated Anthropic event:",JSON.stringify(g)),await i.writeSSE({event:g.type,data:JSON.stringify(g)})}})}var Ze=e=>Object.hasOwn(e,"choices");var F=new et;F.post("/",async e=>{try{return await ke(e)}catch(t){return await f(e,t)}});import{Hono as tt}from"hono";var N=new tt;N.get("/",async e=>{try{s.models||await E();let t=s.models?.data.map(n=>({id:n.id,object:"model",type:"model",created:0,created_at:new Date(0).toISOString(),owned_by:n.vendor,display_name:n.name}));return e.json({object:"list",data:t,has_more:!1})}catch(t){return await f(e,t)}});import{Hono as ot}from"hono";var J=new ot;J.get("/",e=>{try{return e.json({token:s.copilotToken})}catch(t){return console.error("Error fetching token:",t),e.json({error:"Failed to fetch token",token:null},500)}});import{Hono as nt}from"hono";var we=async()=>{let e=await fetch(`${k}/copilot_internal/user`,{headers:S(s)});if(!e.ok)throw new c("Failed to get Copilot usage",e);return await e.json()};var W=new nt;W.get("/",async e=>{try{let t=await we();return e.json(t)}catch(t){return console.error("Error fetching Copilot usage:",t),e.json({error:"Failed to fetch Copilot usage"},500)}});var l=new rt;l.use(it());l.use(st());l.get("/",e=>e.text("Server running"));l.route("/chat/completions",M);l.route("/models",N);l.route("/embeddings",j);l.route("/usage",W);l.route("/token",J);l.route("/v1/chat/completions",M);l.route("/v1/models",N);l.route("/v1/embeddings",j);l.route("/v1/messages",F);l.post("/v1/messages/count_tokens",e=>e.json({input_tokens:1}));async function mt(e){e.verbose&&(u.level=5,u.info("Verbose logging enabled")),s.accountType=e.accountType,e.accountType!=="individual"&&u.info(`Using ${e.accountType} plan GitHub account`),s.manualApprove=e.manual,s.rateLimitSeconds=e.rateLimit,s.rateLimitWait=e.rateLimitWait,s.showToken=e.showToken,await C(),await ie(),e.githubToken?(s.githubToken=e.githubToken,u.info("Using provided GitHub token")):await H(),await pe(),await E(),u.info(`Available models: 
-${s.models?.data.map(n=>`- ${n.id}`).join(`
-`)}`);let t=`http://localhost:${e.port}`;if(e.claudeCode){pt(s.models,"Models should be loaded by now");let n=await u.prompt("Select a model to use with Claude Code",{type:"select",options:s.models.data.map(r=>r.id)}),o=await u.prompt("Select a small model to use with Claude Code",{type:"select",options:s.models.data.map(r=>r.id)}),i=ue({ANTHROPIC_BASE_URL:t,ANTHROPIC_AUTH_TOKEN:"dummy",ANTHROPIC_MODEL:n,ANTHROPIC_SMALL_FAST_MODEL:o},"claude");ct.writeSync(i),u.success("Copied Claude Code command to clipboard!")}u.box(`\u{1F310} Usage Viewer: https://ericc-ch.github.io/copilot-api?endpoint=${t}/usage`),lt({fetch:l.fetch,port:e.port})}var Te=at({meta:{name:"start",description:"Start the Copilot API server"},args:{port:{alias:"p",type:"string",default:"4141",description:"Port to listen on"},verbose:{alias:"v",type:"boolean",default:!1,description:"Enable verbose logging"},"account-type":{alias:"a",type:"string",default:"individual",description:"Account type to use (individual, business, enterprise)"},manual:{type:"boolean",default:!1,description:"Enable manual request approval"},"rate-limit":{alias:"r",type:"string",description:"Rate limit in seconds between requests"},wait:{alias:"w",type:"boolean",default:!1,description:"Wait instead of error when rate limit is hit. Has no effect if rate limit is not set"},"github-token":{alias:"g",type:"string",description:"Provide GitHub token directly (must be generated using the `auth` subcommand)"},"claude-code":{alias:"c",type:"boolean",default:!1,description:"Generate a command to launch Claude Code with Copilot API config"},"show-token":{type:"boolean",default:!1,description:"Show GitHub and Copilot tokens on fetch and refresh"}},run({args:e}){let t=e["rate-limit"],n=t===void 0?void 0:Number.parseInt(t,10);return mt({port:Number.parseInt(e.port,10),verbose:e.verbose,accountType:e["account-type"],manual:e.manual,rateLimit:n,rateLimitWait:!!e.wait,githubToken:e["github-token"],claudeCode:e["claude-code"],showToken:e["show-token"]})}});var ft=ut({meta:{name:"copilot-api",description:"A wrapper around GitHub Copilot API to make it OpenAI compatible, making it usable for other tools."},subCommands:{auth:me,start:Te}});await dt(ft);
+// src/lib/state.ts
+var state = {
+  accountType: "individual",
+  manualApprove: false,
+  rateLimitWait: false,
+  showToken: false
+};
+
+// src/lib/token.ts
+import consola4 from "consola";
+import fs2 from "node:fs/promises";
+
+// src/lib/api-config.ts
+import { randomUUID } from "node:crypto";
+var standardHeaders = () => ({
+  "content-type": "application/json",
+  accept: "application/json"
+});
+var COPILOT_VERSION = "0.26.7";
+var EDITOR_PLUGIN_VERSION = `copilot-chat/${COPILOT_VERSION}`;
+var USER_AGENT = `GitHubCopilotChat/${COPILOT_VERSION}`;
+var API_VERSION = "2025-04-01";
+var copilotBaseUrl = (state2) => state2.accountType === "individual" ? "https://api.githubcopilot.com" : `https://api.${state2.accountType}.githubcopilot.com`;
+var copilotHeaders = (state2, vision = false) => {
+  const headers = {
+    Authorization: `Bearer ${state2.copilotToken}`,
+    "content-type": standardHeaders()["content-type"],
+    "copilot-integration-id": "vscode-chat",
+    "editor-version": `vscode/${state2.vsCodeVersion}`,
+    "editor-plugin-version": EDITOR_PLUGIN_VERSION,
+    "user-agent": USER_AGENT,
+    "openai-intent": "conversation-panel",
+    "x-github-api-version": API_VERSION,
+    "x-request-id": randomUUID(),
+    "x-vscode-user-agent-library-version": "electron-fetch"
+  };
+  if (vision) headers["copilot-vision-request"] = "true";
+  return headers;
+};
+var GITHUB_API_BASE_URL = "https://api.github.com";
+var githubHeaders = (state2) => ({
+  ...standardHeaders(),
+  authorization: `token ${state2.githubToken}`,
+  "editor-version": `vscode/${state2.vsCodeVersion}`,
+  "editor-plugin-version": EDITOR_PLUGIN_VERSION,
+  "user-agent": USER_AGENT,
+  "x-github-api-version": API_VERSION,
+  "x-vscode-user-agent-library-version": "electron-fetch"
+});
+var GITHUB_BASE_URL = "https://github.com";
+var GITHUB_CLIENT_ID = "Iv1.b507a08c87ecfe98";
+var GITHUB_APP_SCOPES = ["read:user"].join(" ");
+
+// src/lib/error.ts
+import consola from "consola";
+var HTTPError = class extends Error {
+  response;
+  constructor(message, response) {
+    super(message);
+    this.response = response;
+  }
+};
+async function forwardError(c, error) {
+  consola.error("Error occurred:", error);
+  if (error instanceof HTTPError) {
+    const cloned = error.response.clone();
+    let errorText;
+    let errorJson;
+    try {
+      errorJson = await cloned.json();
+      consola.error("HTTP error:", errorJson);
+      errorText = typeof errorJson === "string" ? errorJson : JSON.stringify(errorJson);
+    } catch {
+      try {
+        errorText = await cloned.text();
+        consola.error("HTTP error text:", errorText);
+      } catch {
+        errorText = "Failed to read error response";
+        consola.error("Failed to read error response body");
+      }
+    }
+    return c.json(
+      {
+        error: {
+          message: errorText,
+          type: "error"
+        }
+      },
+      error.response.status
+    );
+  }
+  return c.json(
+    {
+      error: {
+        message: error.message,
+        type: "error"
+      }
+    },
+    500
+  );
+}
+
+// src/services/github/get-copilot-token.ts
+var getCopilotToken = async () => {
+  const response = await fetch(
+    `${GITHUB_API_BASE_URL}/copilot_internal/v2/token`,
+    {
+      headers: githubHeaders(state)
+    }
+  );
+  if (!response.ok) throw new HTTPError("Failed to get Copilot token", response);
+  return await response.json();
+};
+
+// src/services/github/get-device-code.ts
+async function getDeviceCode() {
+  const response = await fetch(`${GITHUB_BASE_URL}/login/device/code`, {
+    method: "POST",
+    headers: standardHeaders(),
+    body: JSON.stringify({
+      client_id: GITHUB_CLIENT_ID,
+      scope: GITHUB_APP_SCOPES
+    })
+  });
+  if (!response.ok) throw new HTTPError("Failed to get device code", response);
+  return await response.json();
+}
+
+// src/services/github/get-user.ts
+async function getGitHubUser() {
+  const response = await fetch(`${GITHUB_API_BASE_URL}/user`, {
+    headers: {
+      authorization: `token ${state.githubToken}`,
+      ...standardHeaders()
+    }
+  });
+  if (!response.ok) throw new HTTPError("Failed to get GitHub user", response);
+  return await response.json();
+}
+
+// src/services/github/poll-access-token.ts
+import consola3 from "consola";
+
+// src/lib/utils.ts
+import consola2 from "consola";
+
+// src/services/copilot/get-models.ts
+var getModels = async () => {
+  const response = await fetch(`${copilotBaseUrl(state)}/models`, {
+    headers: copilotHeaders(state)
+  });
+  if (!response.ok) throw new HTTPError("Failed to get models", response);
+  return await response.json();
+};
+
+// src/services/get-vscode-version.ts
+var FALLBACK = "1.98.1";
+async function getVSCodeVersion() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, 5e3);
+  try {
+    const response = await fetch(
+      "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=visual-studio-code-bin",
+      {
+        signal: controller.signal
+      }
+    );
+    const pkgbuild = await response.text();
+    const pkgverRegex = /pkgver=([0-9.]+)/;
+    const match = pkgbuild.match(pkgverRegex);
+    if (match) {
+      return match[1];
+    }
+    return FALLBACK;
+  } catch {
+    return FALLBACK;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+await getVSCodeVersion();
+
+// src/lib/utils.ts
+var sleep = (ms) => new Promise((resolve) => {
+  setTimeout(resolve, ms);
+});
+var isNullish = (value) => value === null || value === void 0;
+async function cacheModels() {
+  const models = await getModels();
+  state.models = models;
+}
+var cacheVSCodeVersion = async () => {
+  const response = await getVSCodeVersion();
+  state.vsCodeVersion = response;
+  consola2.info(`Using VSCode version: ${response}`);
+};
+
+// src/services/github/poll-access-token.ts
+async function pollAccessToken(deviceCode) {
+  const sleepDuration = (deviceCode.interval + 1) * 1e3;
+  consola3.debug(`Polling access token with interval of ${sleepDuration}ms`);
+  while (true) {
+    const response = await fetch(
+      `${GITHUB_BASE_URL}/login/oauth/access_token`,
+      {
+        method: "POST",
+        headers: standardHeaders(),
+        body: JSON.stringify({
+          client_id: GITHUB_CLIENT_ID,
+          device_code: deviceCode.device_code,
+          grant_type: "urn:ietf:params:oauth:grant-type:device_code"
+        })
+      }
+    );
+    if (!response.ok) {
+      await sleep(sleepDuration);
+      consola3.error("Failed to poll access token:", await response.text());
+      continue;
+    }
+    const json = await response.json();
+    consola3.debug("Polling access token response:", json);
+    const { access_token } = json;
+    if (access_token) {
+      return access_token;
+    } else {
+      await sleep(sleepDuration);
+    }
+  }
+}
+
+// src/lib/token.ts
+var readGithubToken = () => fs2.readFile(PATHS.GITHUB_TOKEN_PATH, "utf8");
+var writeGithubToken = (token) => fs2.writeFile(PATHS.GITHUB_TOKEN_PATH, token);
+var setupCopilotToken = async () => {
+  const { token, refresh_in } = await getCopilotToken();
+  state.copilotToken = token;
+  consola4.debug("GitHub Copilot Token fetched successfully!");
+  if (state.showToken) {
+    consola4.info("Copilot token:", token);
+  }
+  const refreshInterval = (refresh_in - 60) * 1e3;
+  setInterval(async () => {
+    consola4.debug("Refreshing Copilot token");
+    try {
+      const { token: token2 } = await getCopilotToken();
+      state.copilotToken = token2;
+      consola4.debug("Copilot token refreshed");
+      if (state.showToken) {
+        consola4.info("Refreshed Copilot token:", token2);
+      }
+    } catch (error) {
+      consola4.error("Failed to refresh Copilot token:", error);
+      throw error;
+    }
+  }, refreshInterval);
+};
+async function setupGitHubToken(options) {
+  try {
+    const githubToken = await readGithubToken();
+    if (githubToken && !options?.force) {
+      state.githubToken = githubToken;
+      if (state.showToken) {
+        consola4.info("GitHub token:", githubToken);
+      }
+      await logUser();
+      return;
+    }
+    consola4.info("Not logged in, getting new access token");
+    const response = await getDeviceCode();
+    consola4.debug("Device code response:", response);
+    consola4.info(
+      `Please enter the code "${response.user_code}" in ${response.verification_uri}`
+    );
+    const token = await pollAccessToken(response);
+    await writeGithubToken(token);
+    state.githubToken = token;
+    if (state.showToken) {
+      consola4.info("GitHub token:", token);
+    }
+    await logUser();
+  } catch (error) {
+    if (error instanceof HTTPError) {
+      consola4.error("Failed to get GitHub token:", await error.response.json());
+      throw error;
+    }
+    consola4.error("Failed to get GitHub token:", error);
+    throw error;
+  }
+}
+async function logUser() {
+  const user = await getGitHubUser();
+  consola4.info(`Logged in as ${user.login}`);
+}
+
+// src/auth.ts
+async function runAuth(options) {
+  if (options.verbose) {
+    consola5.level = 5;
+    consola5.info("Verbose logging enabled");
+  }
+  state.showToken = options.showToken;
+  await ensurePaths();
+  await setupGitHubToken({ force: true });
+  consola5.success("GitHub token written to", PATHS.GITHUB_TOKEN_PATH);
+}
+var auth = defineCommand({
+  meta: {
+    name: "auth",
+    description: "Run GitHub auth flow without running the server"
+  },
+  args: {
+    verbose: {
+      alias: "v",
+      type: "boolean",
+      default: false,
+      description: "Enable verbose logging"
+    },
+    "show-token": {
+      type: "boolean",
+      default: false,
+      description: "Show GitHub token on auth"
+    }
+  },
+  run({ args }) {
+    return runAuth({
+      verbose: args.verbose,
+      showToken: args["show-token"]
+    });
+  }
+});
+
+// src/start.ts
+import { defineCommand as defineCommand2 } from "citty";
+import clipboard from "clipboardy";
+import consola11 from "consola";
+import { serve } from "srvx";
+import invariant from "tiny-invariant";
+
+// src/lib/shell.ts
+import { execSync } from "node:child_process";
+import process from "node:process";
+function getShell() {
+  const { platform, ppid, env } = process;
+  if (platform === "win32") {
+    try {
+      const command = `wmic process get ParentProcessId,Name | findstr "${ppid}"`;
+      const parentProcess = execSync(command, { stdio: "pipe" }).toString();
+      if (parentProcess.toLowerCase().includes("powershell.exe")) {
+        return "powershell";
+      }
+    } catch {
+      return "cmd";
+    }
+    return "cmd";
+  } else {
+    const shellPath = env.SHELL;
+    if (shellPath) {
+      if (shellPath.endsWith("zsh")) return "zsh";
+      if (shellPath.endsWith("fish")) return "fish";
+      if (shellPath.endsWith("bash")) return "bash";
+    }
+    return "sh";
+  }
+}
+function generateEnvScript(envVars, commandToRun = "") {
+  const shell = getShell();
+  const filteredEnvVars = Object.entries(envVars).filter(
+    ([, value]) => value !== void 0
+  );
+  let commandBlock;
+  switch (shell) {
+    case "powershell": {
+      commandBlock = filteredEnvVars.map(([key, value]) => `$env:${key} = ${value}`).join("; ");
+      break;
+    }
+    case "cmd": {
+      commandBlock = filteredEnvVars.map(([key, value]) => `set ${key}=${value}`).join(" & ");
+      break;
+    }
+    case "fish": {
+      commandBlock = filteredEnvVars.map(([key, value]) => `set -gx ${key} ${value}`).join("; ");
+      break;
+    }
+    default: {
+      const assignments = filteredEnvVars.map(([key, value]) => `${key}=${value}`).join(" ");
+      commandBlock = filteredEnvVars.length > 0 ? `export ${assignments}` : "";
+      break;
+    }
+  }
+  if (commandBlock && commandToRun) {
+    const separator = shell === "cmd" ? " & " : " && ";
+    return `${commandBlock}${separator}${commandToRun}`;
+  }
+  return commandBlock || commandToRun;
+}
+
+// src/server.ts
+import { Hono as Hono7 } from "hono";
+import { cors } from "hono/cors";
+import { logger } from "hono/logger";
+
+// src/routes/chat-completions/route.ts
+import { Hono } from "hono";
+
+// src/routes/chat-completions/handler.ts
+import consola9 from "consola";
+import { streamSSE } from "hono/streaming";
+
+// src/lib/approval.ts
+import consola6 from "consola";
+var awaitApproval = async () => {
+  const response = await consola6.prompt(`Accept incoming request?`, {
+    type: "confirm"
+  });
+  if (!response)
+    throw new HTTPError(
+      "Request rejected",
+      Response.json({ message: "Request rejected" }, { status: 403 })
+    );
+};
+
+// src/lib/rate-limit.ts
+import consola7 from "consola";
+async function checkRateLimit(state2) {
+  if (state2.rateLimitSeconds === void 0) return;
+  const now = Date.now();
+  if (!state2.lastRequestTimestamp) {
+    state2.lastRequestTimestamp = now;
+    return;
+  }
+  const elapsedSeconds = (now - state2.lastRequestTimestamp) / 1e3;
+  if (elapsedSeconds > state2.rateLimitSeconds) {
+    state2.lastRequestTimestamp = now;
+    return;
+  }
+  const waitTimeSeconds = Math.ceil(state2.rateLimitSeconds - elapsedSeconds);
+  if (!state2.rateLimitWait) {
+    consola7.warn(
+      `Rate limit exceeded. Need to wait ${waitTimeSeconds} more seconds.`
+    );
+    throw new HTTPError(
+      "Rate limit exceeded",
+      Response.json({ message: "Rate limit exceeded" }, { status: 429 })
+    );
+  }
+  const waitTimeMs = waitTimeSeconds * 1e3;
+  consola7.warn(
+    `Rate limit reached. Waiting ${waitTimeSeconds} seconds before proceeding...`
+  );
+  await sleep(waitTimeMs);
+  state2.lastRequestTimestamp = now;
+  consola7.info("Rate limit wait completed, proceeding with request");
+  return;
+}
+
+// src/lib/tokenizer.ts
+import { countTokens } from "gpt-tokenizer/model/gpt-4o";
+var getTokenCount = (messages) => {
+  const simplifiedMessages = messages.map((message) => {
+    let content = "";
+    if (typeof message.content === "string") {
+      content = message.content;
+    } else if (Array.isArray(message.content)) {
+      content = message.content.filter((part) => part.type === "text").map((part) => part.text).join("");
+    }
+    return { ...message, content };
+  });
+  let inputMessages = simplifiedMessages.filter((message) => {
+    return message.role !== "tool";
+  });
+  let outputMessages = [];
+  const lastMessage = simplifiedMessages.at(-1);
+  if (lastMessage?.role === "assistant") {
+    inputMessages = simplifiedMessages.slice(0, -1);
+    outputMessages = [lastMessage];
+  }
+  const inputTokens = countTokens(inputMessages);
+  const outputTokens = countTokens(outputMessages);
+  return {
+    input: inputTokens,
+    output: outputTokens
+  };
+};
+
+// src/services/copilot/create-chat-completions.ts
+import consola8 from "consola";
+import { events } from "fetch-event-stream";
+var createChatCompletions = async (payload) => {
+  if (!state.copilotToken) throw new Error("Copilot token not found");
+  const enableVision = payload.messages.some(
+    (x) => typeof x.content !== "string" && x.content?.some((x2) => x2.type === "image_url")
+  );
+  const isAgentCall = payload.messages.some(
+    (msg) => ["assistant", "tool"].includes(msg.role)
+  );
+  const headers = {
+    ...copilotHeaders(state, enableVision),
+    "X-Initiator": isAgentCall ? "agent" : "user"
+  };
+  const response = await fetch(`${copilotBaseUrl(state)}/chat/completions`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) {
+    consola8.error("Failed to create chat completions", response);
+    throw new HTTPError("Failed to create chat completions", response);
+  }
+  if (payload.stream) {
+    return events(response);
+  }
+  return await response.json();
+};
+
+// src/routes/chat-completions/handler.ts
+async function handleCompletion(c) {
+  await checkRateLimit(state);
+  let payload = await c.req.json();
+  consola9.debug("Request payload:", JSON.stringify(payload).slice(-400));
+  consola9.info("Current token count:", getTokenCount(payload.messages));
+  if (state.manualApprove) await awaitApproval();
+  if (isNullish(payload.max_tokens)) {
+    const selectedModel = state.models?.data.find(
+      (model) => model.id === payload.model
+    );
+    payload = {
+      ...payload,
+      max_tokens: selectedModel?.capabilities.limits.max_output_tokens
+    };
+    consola9.debug("Set max_tokens to:", JSON.stringify(payload.max_tokens));
+  }
+  const response = await createChatCompletions(payload);
+  if (isNonStreaming(response)) {
+    consola9.debug("Non-streaming response:", JSON.stringify(response));
+    return c.json(response);
+  }
+  consola9.debug("Streaming response");
+  return streamSSE(c, async (stream) => {
+    for await (const chunk of response) {
+      consola9.debug("Streaming chunk:", JSON.stringify(chunk));
+      await stream.writeSSE(chunk);
+    }
+  });
+}
+var isNonStreaming = (response) => Object.hasOwn(response, "choices");
+
+// src/routes/chat-completions/route.ts
+var completionRoutes = new Hono();
+completionRoutes.post("/", async (c) => {
+  try {
+    return await handleCompletion(c);
+  } catch (error) {
+    return await forwardError(c, error);
+  }
+});
+
+// src/routes/embeddings/route.ts
+import { Hono as Hono2 } from "hono";
+
+// src/services/copilot/create-embeddings.ts
+var createEmbeddings = async (payload) => {
+  if (!state.copilotToken) throw new Error("Copilot token not found");
+  const response = await fetch(`${copilotBaseUrl(state)}/embeddings`, {
+    method: "POST",
+    headers: copilotHeaders(state),
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) throw new HTTPError("Failed to create embeddings", response);
+  return await response.json();
+};
+
+// src/routes/embeddings/route.ts
+var embeddingRoutes = new Hono2();
+embeddingRoutes.post("/", async (c) => {
+  try {
+    const paylod = await c.req.json();
+    const response = await createEmbeddings(paylod);
+    return c.json(response);
+  } catch (error) {
+    return await forwardError(c, error);
+  }
+});
+
+// src/routes/messages/route.ts
+import { Hono as Hono3 } from "hono";
+
+// src/routes/messages/handler.ts
+import consola10 from "consola";
+import { streamSSE as streamSSE2 } from "hono/streaming";
+
+// src/routes/messages/utils.ts
+function mapOpenAIStopReasonToAnthropic(finishReason) {
+  if (finishReason === null) {
+    return null;
+  }
+  const stopReasonMap = {
+    stop: "end_turn",
+    length: "max_tokens",
+    tool_calls: "tool_use",
+    content_filter: "end_turn"
+  };
+  return stopReasonMap[finishReason];
+}
+
+// src/routes/messages/non-stream-translation.ts
+function fixMessageSequence(messages) {
+  const fixedMessages = [];
+  for (let i = 0; i < messages.length; i++) {
+    const message = messages[i];
+    fixedMessages.push(message);
+    if (message.role === "assistant" && message.tool_calls && message.tool_calls.length > 0) {
+      const foundToolResponses = /* @__PURE__ */ new Set();
+      let j = i + 1;
+      while (j < messages.length && messages[j].role === "tool") {
+        const toolMessage = messages[j];
+        if ("tool_call_id" in toolMessage && toolMessage.tool_call_id) {
+          foundToolResponses.add(toolMessage.tool_call_id);
+        }
+        j++;
+      }
+      for (const toolCall of message.tool_calls) {
+        if (!foundToolResponses.has(toolCall.id)) {
+          fixedMessages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: "Tool execution completed."
+          });
+        }
+      }
+    }
+  }
+  return fixedMessages;
+}
+function translateToOpenAI(payload) {
+  const translated = {
+    model: payload.model,
+    messages: translateAnthropicMessagesToOpenAI(
+      payload.messages,
+      payload.system
+    ),
+    max_tokens: payload.max_tokens,
+    stop: payload.stop_sequences,
+    stream: payload.stream,
+    temperature: payload.temperature,
+    top_p: payload.top_p,
+    user: payload.metadata?.user_id,
+    tools: translateAnthropicToolsToOpenAI(payload.tools),
+    tool_choice: translateAnthropicToolChoiceToOpenAI(payload.tool_choice)
+  };
+  translated.messages = fixMessageSequence(translated.messages);
+  return translated;
+}
+function translateAnthropicMessagesToOpenAI(anthropicMessages, system) {
+  const systemMessages = handleSystemPrompt(system);
+  const otherMessages = [];
+  for (const message of anthropicMessages) {
+    if (message.role === "user") {
+      otherMessages.push(...handleUserMessage(message));
+    } else {
+      const assistantMessages = handleAssistantMessage(message);
+      otherMessages.push(...assistantMessages);
+    }
+  }
+  return [...systemMessages, ...otherMessages];
+}
+function handleSystemPrompt(system) {
+  if (!system) {
+    return [];
+  }
+  if (typeof system === "string") {
+    return [{ role: "system", content: system }];
+  } else {
+    const systemText = system.map((block) => block.text).join("\n\n");
+    return [{ role: "system", content: systemText }];
+  }
+}
+function handleUserMessage(message) {
+  const msgs = [];
+  if (Array.isArray(message.content)) {
+    const toolResultBlocks = message.content.filter(
+      (block) => block.type === "tool_result"
+    );
+    const textBlocks = message.content.filter((block) => block.type === "text");
+    const otherBlocks = message.content.filter(
+      (block) => block.type !== "tool_result" && block.type !== "text"
+    );
+    for (const block of toolResultBlocks) {
+      msgs.push({
+        role: "tool",
+        tool_call_id: block.tool_use_id,
+        content: typeof block.content === "string" ? block.content : JSON.stringify(block.content)
+      });
+    }
+    if (textBlocks.length > 0 || otherBlocks.length > 0) {
+      const textContent = [
+        ...textBlocks.map((b) => b.text),
+        ...otherBlocks.map((b) => JSON.stringify(b))
+        // fallback for custom blocks
+      ].join("\n\n").trim();
+      if (textContent.length > 0) {
+        msgs.push({
+          role: "user",
+          content: textContent
+        });
+      }
+    }
+  } else {
+    msgs.push({
+      role: "user",
+      content: mapContent(message.content)
+    });
+  }
+  return msgs;
+}
+function handleAssistantMessage(message) {
+  if (!Array.isArray(message.content)) {
+    return [
+      {
+        role: "assistant",
+        content: mapContent(message.content)
+      }
+    ];
+  }
+  const toolUseBlocks = message.content.filter(
+    (block) => block.type === "tool_use"
+  );
+  const textBlocks = message.content.filter(
+    (block) => block.type === "text"
+  );
+  return toolUseBlocks.length > 0 ? [
+    {
+      role: "assistant",
+      content: textBlocks.map((b) => b.text).join("\n\n") || null,
+      tool_calls: toolUseBlocks.map((toolUse) => ({
+        id: toolUse.id,
+        type: "function",
+        function: {
+          name: toolUse.name,
+          arguments: JSON.stringify(toolUse.input)
+        }
+      }))
+    }
+  ] : [
+    {
+      role: "assistant",
+      content: mapContent(message.content)
+    }
+  ];
+}
+function mapContent(content) {
+  if (typeof content === "string") {
+    return content;
+  }
+  if (!Array.isArray(content)) {
+    return null;
+  }
+  const hasImage = content.some((block) => block.type === "image");
+  if (!hasImage) {
+    return content.filter((block) => block.type === "text").map((block) => block.text).join("\n\n");
+  }
+  const contentParts = [];
+  for (const block of content) {
+    if (block.type === "text") {
+      contentParts.push({ type: "text", text: block.text });
+    } else if (block.type === "image") {
+      contentParts.push({
+        type: "image_url",
+        image_url: {
+          url: `data:${block.source.media_type};base64,${block.source.data}`
+        }
+      });
+    }
+  }
+  return contentParts;
+}
+function translateAnthropicToolsToOpenAI(anthropicTools) {
+  if (!anthropicTools) {
+    return void 0;
+  }
+  return anthropicTools.map((tool) => ({
+    type: "function",
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.input_schema
+    }
+  }));
+}
+function translateAnthropicToolChoiceToOpenAI(anthropicToolChoice) {
+  if (!anthropicToolChoice) {
+    return void 0;
+  }
+  switch (anthropicToolChoice.type) {
+    case "auto": {
+      return "auto";
+    }
+    case "any": {
+      return "required";
+    }
+    case "tool": {
+      if (anthropicToolChoice.name) {
+        return {
+          type: "function",
+          function: { name: anthropicToolChoice.name }
+        };
+      }
+      return void 0;
+    }
+    case "none": {
+      return "none";
+    }
+    default: {
+      return void 0;
+    }
+  }
+}
+function translateToAnthropic(response) {
+  const choice = response.choices[0];
+  const textBlocks = getAnthropicTextBlocks(choice.message.content);
+  const toolUseBlocks = getAnthropicToolUseBlocks(choice.message.tool_calls);
+  return {
+    id: response.id,
+    type: "message",
+    role: "assistant",
+    model: response.model,
+    content: [...textBlocks, ...toolUseBlocks],
+    stop_reason: mapOpenAIStopReasonToAnthropic(choice.finish_reason),
+    stop_sequence: null,
+    usage: {
+      input_tokens: response.usage?.prompt_tokens ?? 0,
+      output_tokens: response.usage?.completion_tokens ?? 0
+    }
+  };
+}
+function getAnthropicTextBlocks(messageContent) {
+  if (typeof messageContent === "string") {
+    return [{ type: "text", text: messageContent }];
+  }
+  if (Array.isArray(messageContent)) {
+    return messageContent.filter((part) => part.type === "text").map((part) => ({ type: "text", text: part.text }));
+  }
+  return [];
+}
+function getAnthropicToolUseBlocks(toolCalls) {
+  if (!toolCalls) {
+    return [];
+  }
+  return toolCalls.map((toolCall) => ({
+    type: "tool_use",
+    id: toolCall.id,
+    name: toolCall.function.name,
+    input: JSON.parse(toolCall.function.arguments)
+  }));
+}
+
+// src/routes/messages/stream-translation.ts
+function isToolBlockOpen(state2) {
+  if (!state2.contentBlockOpen) {
+    return false;
+  }
+  return Object.values(state2.toolCalls).some(
+    (tc) => tc.anthropicBlockIndex === state2.contentBlockIndex
+  );
+}
+function translateChunkToAnthropicEvents(chunk, state2) {
+  const events2 = [];
+  if (chunk.choices.length === 0) {
+    return events2;
+  }
+  const choice = chunk.choices[0];
+  const { delta } = choice;
+  if (!state2.messageStartSent) {
+    events2.push({
+      type: "message_start",
+      message: {
+        id: chunk.id,
+        type: "message",
+        role: "assistant",
+        content: [],
+        model: chunk.model,
+        stop_reason: null,
+        stop_sequence: null,
+        usage: {
+          input_tokens: 1,
+          output_tokens: 1
+          // Anthropic requires this to be > 0
+        }
+      }
+    });
+    state2.messageStartSent = true;
+  }
+  if (delta.content) {
+    if (isToolBlockOpen(state2)) {
+      events2.push({
+        type: "content_block_stop",
+        index: state2.contentBlockIndex
+      });
+      state2.contentBlockIndex++;
+      state2.contentBlockOpen = false;
+    }
+    if (!state2.contentBlockOpen) {
+      events2.push({
+        type: "content_block_start",
+        index: state2.contentBlockIndex,
+        content_block: {
+          type: "text",
+          text: ""
+        }
+      });
+      state2.contentBlockOpen = true;
+    }
+    events2.push({
+      type: "content_block_delta",
+      index: state2.contentBlockIndex,
+      delta: {
+        type: "text_delta",
+        text: delta.content
+      }
+    });
+  }
+  if (delta.tool_calls) {
+    for (const toolCall of delta.tool_calls) {
+      if (toolCall.id && toolCall.function?.name) {
+        if (state2.contentBlockOpen) {
+          events2.push({
+            type: "content_block_stop",
+            index: state2.contentBlockIndex
+          });
+          state2.contentBlockIndex++;
+          state2.contentBlockOpen = false;
+        }
+        const anthropicBlockIndex = state2.contentBlockIndex;
+        state2.toolCalls[toolCall.index] = {
+          id: toolCall.id,
+          name: toolCall.function.name,
+          anthropicBlockIndex
+        };
+        events2.push({
+          type: "content_block_start",
+          index: anthropicBlockIndex,
+          content_block: {
+            type: "tool_use",
+            id: toolCall.id,
+            name: toolCall.function.name,
+            input: {}
+          }
+        });
+        state2.contentBlockOpen = true;
+      }
+      if (toolCall.function?.arguments) {
+        const toolCallInfo = state2.toolCalls[toolCall.index];
+        if (toolCallInfo) {
+          events2.push({
+            type: "content_block_delta",
+            index: toolCallInfo.anthropicBlockIndex,
+            delta: {
+              type: "input_json_delta",
+              partial_json: toolCall.function.arguments
+            }
+          });
+        }
+      }
+    }
+  }
+  if (choice.finish_reason) {
+    if (state2.contentBlockOpen) {
+      events2.push({
+        type: "content_block_stop",
+        index: state2.contentBlockIndex
+      });
+      state2.contentBlockOpen = false;
+    }
+    events2.push(
+      {
+        type: "message_delta",
+        delta: {
+          stop_reason: mapOpenAIStopReasonToAnthropic(choice.finish_reason),
+          stop_sequence: null
+        },
+        usage: {
+          output_tokens: 1
+        }
+      },
+      {
+        type: "message_stop"
+      }
+    );
+  }
+  return events2;
+}
+
+// src/routes/messages/handler.ts
+async function handleCompletion2(c) {
+  await checkRateLimit(state);
+  const anthropicPayload = await c.req.json();
+  consola10.debug("Anthropic request payload:", JSON.stringify(anthropicPayload));
+  const openAIPayload = translateToOpenAI(anthropicPayload);
+  consola10.debug(
+    "Translated OpenAI request payload:",
+    JSON.stringify(openAIPayload)
+  );
+  if (state.manualApprove) {
+    await awaitApproval();
+  }
+  const response = await createChatCompletions(openAIPayload);
+  if (isNonStreaming2(response)) {
+    consola10.debug(
+      "Non-streaming response from Copilot:",
+      JSON.stringify(response).slice(-400)
+    );
+    const anthropicResponse = translateToAnthropic(response);
+    consola10.debug(
+      "Translated Anthropic response:",
+      JSON.stringify(anthropicResponse)
+    );
+    return c.json(anthropicResponse);
+  }
+  consola10.debug("Streaming response from Copilot");
+  return streamSSE2(c, async (stream) => {
+    const streamState = {
+      messageStartSent: false,
+      contentBlockIndex: 0,
+      contentBlockOpen: false,
+      toolCalls: {}
+    };
+    for await (const rawEvent of response) {
+      consola10.debug("Copilot raw stream event:", JSON.stringify(rawEvent));
+      if (rawEvent.data === "[DONE]") {
+        break;
+      }
+      if (!rawEvent.data) {
+        continue;
+      }
+      const chunk = JSON.parse(rawEvent.data);
+      const events2 = translateChunkToAnthropicEvents(chunk, streamState);
+      for (const event of events2) {
+        consola10.debug("Translated Anthropic event:", JSON.stringify(event));
+        await stream.writeSSE({
+          event: event.type,
+          data: JSON.stringify(event)
+        });
+      }
+    }
+  });
+}
+var isNonStreaming2 = (response) => Object.hasOwn(response, "choices");
+
+// src/routes/messages/route.ts
+var messageRoutes = new Hono3();
+messageRoutes.post("/", async (c) => {
+  try {
+    return await handleCompletion2(c);
+  } catch (error) {
+    return await forwardError(c, error);
+  }
+});
+
+// src/routes/models/route.ts
+import { Hono as Hono4 } from "hono";
+var modelRoutes = new Hono4();
+modelRoutes.get("/", async (c) => {
+  try {
+    if (!state.models) {
+      await cacheModels();
+    }
+    const models = state.models?.data.map((model) => ({
+      id: model.id,
+      object: "model",
+      type: "model",
+      created: 0,
+      // No date available from source
+      created_at: (/* @__PURE__ */ new Date(0)).toISOString(),
+      // No date available from source
+      owned_by: model.vendor,
+      display_name: model.name
+    }));
+    return c.json({
+      object: "list",
+      data: models,
+      has_more: false
+    });
+  } catch (error) {
+    return await forwardError(c, error);
+  }
+});
+
+// src/routes/token/route.ts
+import { Hono as Hono5 } from "hono";
+var tokenRoute = new Hono5();
+tokenRoute.get("/", (c) => {
+  try {
+    return c.json({
+      token: state.copilotToken
+    });
+  } catch (error) {
+    console.error("Error fetching token:", error);
+    return c.json({ error: "Failed to fetch token", token: null }, 500);
+  }
+});
+
+// src/routes/usage/route.ts
+import { Hono as Hono6 } from "hono";
+
+// src/services/github/get-copilot-usage.ts
+var getCopilotUsage = async () => {
+  const response = await fetch(`${GITHUB_API_BASE_URL}/copilot_internal/user`, {
+    headers: githubHeaders(state)
+  });
+  if (!response.ok) {
+    throw new HTTPError("Failed to get Copilot usage", response);
+  }
+  return await response.json();
+};
+
+// src/routes/usage/route.ts
+var usageRoute = new Hono6();
+usageRoute.get("/", async (c) => {
+  try {
+    const usage = await getCopilotUsage();
+    return c.json(usage);
+  } catch (error) {
+    console.error("Error fetching Copilot usage:", error);
+    return c.json({ error: "Failed to fetch Copilot usage" }, 500);
+  }
+});
+
+// src/server.ts
+var server = new Hono7();
+server.use(logger());
+server.use(cors());
+server.get("/", (c) => c.text("Server running"));
+server.route("/chat/completions", completionRoutes);
+server.route("/models", modelRoutes);
+server.route("/embeddings", embeddingRoutes);
+server.route("/usage", usageRoute);
+server.route("/token", tokenRoute);
+server.route("/v1/chat/completions", completionRoutes);
+server.route("/v1/models", modelRoutes);
+server.route("/v1/embeddings", embeddingRoutes);
+server.route("/v1/messages", messageRoutes);
+server.post("/v1/messages/count_tokens", (c) => c.json({ input_tokens: 1 }));
+
+// src/start.ts
+async function runServer(options) {
+  if (options.verbose) {
+    consola11.level = 5;
+    consola11.info("Verbose logging enabled");
+  }
+  state.accountType = options.accountType;
+  if (options.accountType !== "individual") {
+    consola11.info(`Using ${options.accountType} plan GitHub account`);
+  }
+  state.manualApprove = options.manual;
+  state.rateLimitSeconds = options.rateLimit;
+  state.rateLimitWait = options.rateLimitWait;
+  state.showToken = options.showToken;
+  await ensurePaths();
+  await cacheVSCodeVersion();
+  if (options.githubToken) {
+    state.githubToken = options.githubToken;
+    consola11.info("Using provided GitHub token");
+  } else {
+    await setupGitHubToken();
+  }
+  await setupCopilotToken();
+  await cacheModels();
+  consola11.info(
+    `Available models: 
+${state.models?.data.map((model) => `- ${model.id}`).join("\n")}`
+  );
+  const serverUrl = `http://localhost:${options.port}`;
+  if (options.claudeCode) {
+    invariant(state.models, "Models should be loaded by now");
+    const selectedModel = await consola11.prompt(
+      "Select a model to use with Claude Code",
+      {
+        type: "select",
+        options: state.models.data.map((model) => model.id)
+      }
+    );
+    const selectedSmallModel = await consola11.prompt(
+      "Select a small model to use with Claude Code",
+      {
+        type: "select",
+        options: state.models.data.map((model) => model.id)
+      }
+    );
+    const command = generateEnvScript(
+      {
+        ANTHROPIC_BASE_URL: serverUrl,
+        ANTHROPIC_AUTH_TOKEN: "dummy",
+        ANTHROPIC_MODEL: selectedModel,
+        ANTHROPIC_SMALL_FAST_MODEL: selectedSmallModel
+      },
+      "claude"
+    );
+    clipboard.writeSync(command);
+    consola11.success("Copied Claude Code command to clipboard!");
+  }
+  consola11.box(
+    `\u{1F310} Usage Viewer: https://ericc-ch.github.io/copilot-api?endpoint=${serverUrl}/usage`
+  );
+  serve({
+    fetch: server.fetch,
+    port: options.port
+  });
+}
+var start = defineCommand2({
+  meta: {
+    name: "start",
+    description: "Start the Copilot API server"
+  },
+  args: {
+    port: {
+      alias: "p",
+      type: "string",
+      default: "4141",
+      description: "Port to listen on"
+    },
+    verbose: {
+      alias: "v",
+      type: "boolean",
+      default: false,
+      description: "Enable verbose logging"
+    },
+    "account-type": {
+      alias: "a",
+      type: "string",
+      default: "individual",
+      description: "Account type to use (individual, business, enterprise)"
+    },
+    manual: {
+      type: "boolean",
+      default: false,
+      description: "Enable manual request approval"
+    },
+    "rate-limit": {
+      alias: "r",
+      type: "string",
+      description: "Rate limit in seconds between requests"
+    },
+    wait: {
+      alias: "w",
+      type: "boolean",
+      default: false,
+      description: "Wait instead of error when rate limit is hit. Has no effect if rate limit is not set"
+    },
+    "github-token": {
+      alias: "g",
+      type: "string",
+      description: "Provide GitHub token directly (must be generated using the `auth` subcommand)"
+    },
+    "claude-code": {
+      alias: "c",
+      type: "boolean",
+      default: false,
+      description: "Generate a command to launch Claude Code with Copilot API config"
+    },
+    "show-token": {
+      type: "boolean",
+      default: false,
+      description: "Show GitHub and Copilot tokens on fetch and refresh"
+    }
+  },
+  run({ args }) {
+    const rateLimitRaw = args["rate-limit"];
+    const rateLimit = (
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      rateLimitRaw === void 0 ? void 0 : Number.parseInt(rateLimitRaw, 10)
+    );
+    return runServer({
+      port: Number.parseInt(args.port, 10),
+      verbose: args.verbose,
+      accountType: args["account-type"],
+      manual: args.manual,
+      rateLimit,
+      rateLimitWait: Boolean(args.wait),
+      githubToken: args["github-token"],
+      claudeCode: args["claude-code"],
+      showToken: args["show-token"]
+    });
+  }
+});
+
+// src/main.ts
+var main = defineCommand3({
+  meta: {
+    name: "copilot-api",
+    description: "A wrapper around GitHub Copilot API to make it OpenAI compatible, making it usable for other tools."
+  },
+  subCommands: { auth, start }
+});
+await runMain(main);
+//# sourceMappingURL=main.js.map
